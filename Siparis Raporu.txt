@@ -1,0 +1,351 @@
+*&---------------------------------------------------------------------*
+*& Report Z_SIPARIS_RAPORU
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT z_siparis_raporu.
+
+START-OF-SELECTION.
+
+  DATA: siparisno(10) TYPE c,
+        kalem(6)      TYPE c,
+        malzeme(40)   TYPE c,
+        kalemt(42)    TYPE c,
+        netdeger(35)  TYPE c,
+        siparisv(12)  TYPE c,
+        yaratmat(13)  TYPE c,
+        satisbturu(6) TYPE c,
+        "yaratan(12) TYPE c,
+        bosluk(107)   TYPE c,
+        bosluk2(37)   TYPE c,
+        aratoplam     TYPE p DECIMALS 2,
+        toplam        TYPE p DECIMALS 2.
+
+  DATA: sno3(10)    TYPE c,
+        kalem3(6)   TYPE c,
+        musteri(10) TYPE c,
+        ad(35)      TYPE c,
+        city(15)    TYPE c,
+        sokak(30)   TYPE c,
+        suppl1(15)  TYPE c,
+        suppl2(15)  TYPE c,
+        suppl3(40)  TYPE c.
+
+
+  siparisno = 'Sipariş No'.
+  kalem = 'Kalem'.
+  malzeme = 'Malzeme'.
+  kalemt = 'Kalem tanımı'.
+  netdeger = 'Net D.'.
+  siparisv = 'Sipariş V.'.
+  yaratmat = 'Yaratma T.'.
+  satisbturu = 'S.B.Turu'.
+  "yaratan = 'Yaratan'.
+  sno3 = 'Sipariş No'.
+  kalem3 = 'Kalem'.
+  musteri = 'Müşteri'.
+  ad = 'Ad'.
+  city = 'Yerleşim Yeri'.
+  sokak = 'Sokak'.
+  suppl1 = 'Sokak2'.
+  suppl2 = 'Sokak3'.
+  suppl3 = 'Sokak4'.
+
+  TABLES: vbap,
+          vbak,
+          vbpa,
+          adrc,
+          kna1.
+
+  TYPES : BEGIN OF ty_data  ,
+            vbeln TYPE vbap-vbeln,
+            posnr TYPE vbap-posnr,
+            matnr TYPE vbap-matnr,
+            arktx TYPE vbap-arktx,
+            netwr TYPE vbap-netwr,
+            kunnr TYPE vbak-kunnr,
+            erdat TYPE vbak-erdat,
+            auart TYPE vbak-auart,
+            ernam TYPE vbap-ernam,
+            waerk TYPE vbap-waerk.
+
+  TYPES END OF ty_data.
+
+  TYPES tt_data TYPE STANDARD TABLE OF ty_data WITH DEFAULT KEY.
+
+
+  DATA gs_data TYPE ty_data."structure
+  "DATA: gt_data TYPE STANDARD TABLE OF ty_data WITH DEFAULT KEY.
+  DATA gt_data TYPE tt_data.
+  " go_salv TYPE REF TO cl_salv_table.
+
+  TYPES : BEGIN OF ty_data2  ,
+            vbeln3     TYPE vbap-vbeln,
+            posnr3     TYPE vbap-posnr,
+            vbeln2     TYPE vbpa-vbeln,
+            posnr2     TYPE vbpa-posnr,
+            kunnr2     TYPE vbpa-kunnr,
+            adrnr      TYPE vbpa-adrnr,
+            name1      TYPE kna1-name1,
+            city1      TYPE adrc-city1,
+            street     TYPE adrc-street,
+            str_suppl1 TYPE adrc-str_suppl1,
+            str_suppl2 TYPE adrc-str_suppl2,
+            str_suppl3 TYPE adrc-str_suppl3.
+
+  TYPES END OF ty_data2.
+
+  TYPES tt_data2 TYPE STANDARD TABLE OF ty_data2 WITH DEFAULT KEY.
+
+  DATA: gs_data2 TYPE ty_data2,
+        gt_data2 TYPE tt_data2,
+        gv_vbeln TYPE vbeln,
+        gv_posnr TYPE posnr,
+        bos      TYPE c.
+
+  bos = ' '.
+
+  SELECTION-SCREEN BEGIN OF BLOCK blok1 WITH FRAME TITLE title1.
+
+  SELECT-OPTIONS: s_vbeln FOR vbap-vbeln,
+                  s_matnr FOR vbap-matnr,
+                  s_auart FOR vbak-auart,
+                  s_erdat FOR vbap-erdat DEFAULT ' ' TO sy-datum , "DEFAULT ' ' TO sy-datlo ,
+                  s_ernam FOR vbap-ernam DEFAULT sy-uname . "Sisteme giriş yapan kullanıcı adı getiriyor.
+
+
+  SELECTION-SCREEN END OF BLOCK blok1.
+*
+*SELECTION-SCREEN BEGIN OF BLOCK blok2 WITH FRAME TITLE title2 NO INTERVALS.
+*
+*  SELECTION-SCREEN: PUSHBUTTON 1(5) btnRapor USER-COMMAND rapor.
+*
+*  SELECTION-SCREEN END OF BLOCK blok2.
+
+* at selection screen output
+
+* at SELECTION-SCREEN.
+
+*INITIALIZATION.
+*
+*  btnRapor = 'Rapor'.
+
+START-OF-SELECTION.
+
+
+  " LEFT OUTER JOIN kna1 AS n ON n~kunnr = m~kunnr
+
+*      cl_salv_table=>factory(
+*        IMPORTING
+*          r_salv_table = go_salv
+*        CHANGING
+*          t_table = gt_data
+*        ).
+*
+*      DATA: lo_func TYPE REF TO cl_salv_functions.
+*
+*      lo_func = go_salv->get_functions( ).
+*      lo_func->set_all( abap_true
+*      ).
+*
+*go_salv->display( ).
+  "Excel dosyası oluşturarak dosyayı indirme.
+*CALL  FUNCTION  'WS_DOWNLOAD'
+*EXPORTING
+*  FILENAME    =   'C:\deneme\Deneme.xls'
+*  FILETYPE    =   'DAT'
+*TABLES
+*  DATA_TAB    =   gt_data.
+
+
+
+  PERFORM get_order_main CHANGING gt_data[].
+
+  PERFORM write_main_table TABLES gt_data[].
+
+AT LINE-SELECTION.
+
+  PERFORM get_split USING sy-lisel CHANGING gv_vbeln gv_posnr.
+
+  PERFORM get_order_detail USING gv_vbeln gv_posnr CHANGING gt_data2[].
+
+  PERFORM write_detail_table TABLES gt_data2[].
+
+
+
+FORM get_order_main CHANGING gt_data TYPE tt_data .
+  SELECT s~vbeln, s~posnr, s~matnr, s~arktx, s~netwr, a~kunnr, a~erdat, a~auart,s~ernam,s~waerk
+  INTO TABLE  @gt_data
+  FROM vbak AS a
+  LEFT OUTER JOIN vbap AS s ON a~vbeln = s~vbeln WHERE s~vbeln   IN @s_vbeln
+                                                 AND   s~posnr   IN @s_matnr
+                                                 AND   a~auart   IN @s_auart
+                                                 AND   a~erdat   IN @s_erdat
+                                                 AND   s~ernam   IN @s_ernam
+                                                 AND   s~vbeln   <> ' '
+                                                 AND   s~posnr   <> ' '
+                                                 AND   s~matnr   <> ' '
+                                                 AND   s~arktx   <> ' '
+                                                 AND   s~netwr   <> ' '
+                                                 AND   a~kunnr   <> ' '
+                                                 AND   a~erdat   <> ' '
+                                                 AND   a~auart   <> ' '
+                                                 AND   s~ernam   <> ' '
+                                                 AND   s~posnr   >= 10
+                                                 ORDER BY s~vbeln, s~posnr.
+
+
+ENDFORM.
+
+FORM get_order_detail USING gv_vbeln gv_posnr CHANGING gt_data2 TYPE tt_data2 .
+
+  SELECT t~vbeln, t~posnr, m~vbeln, m~posnr, m~kunnr,m~adrnr, n~name1, k~city1, k~street, k~str_suppl1, k~str_suppl2, k~str_suppl3
+  INTO TABLE @gt_data2
+  FROM vbap AS t
+  LEFT JOIN vbpa AS m ON t~vbeln = m~vbeln AND
+                          t~posnr = m~posnr
+  LEFT JOIN kna1 AS n ON n~kunnr = m~kunnr
+  LEFT JOIN adrc AS k ON k~addrnumber = m~adrnr  WHERE t~vbeln = @gv_vbeln AND
+                                                        t~posnr = @gv_posnr.
+
+ENDFORM.
+
+FORM  write_main_table TABLES gt_data TYPE tt_data.
+
+  WRITE: sy-uline(189).
+  WRITE: / sy-vline, siparisno, sy-vline, kalem,sy-vline,malzeme,
+  sy-vline,kalemt,sy-vline,netdeger, sy-vline,siparisv,sy-vline,
+  yaratmat,sy-vline,satisbturu,sy-vline.
+
+  DATA: sno(10) TYPE c,
+        n       TYPE i VALUE 2.
+
+  READ TABLE gt_data INTO gs_data-vbeln INDEX 2.
+  sno = gs_data-vbeln.
+
+  aratoplam = 0.
+
+
+  LOOP AT gt_data INTO gs_data.
+
+    WRITE: sy-uline(189).
+    FORMAT RESET INTENSIFIED OFF COLOR COL_TOTAL.
+    WRITE: / sy-vline, gs_data-vbeln,sy-vline.
+
+    FORMAT RESET INTENSIFIED OFF COLOR COL_NORMAL.
+    WRITE: gs_data-posnr HOTSPOT ,sy-vline.
+
+    FORMAT RESET INTENSIFIED OFF COLOR COL_HEADING.
+    WRITE: gs_data-matnr,sy-vline.
+
+    FORMAT RESET INTENSIFIED OFF COLOR COL_GROUP.
+    WRITE:  ' ',gs_data-arktx,sy-vline.
+
+    FORMAT RESET INTENSIFIED OFF COLOR COL_NEGATIVE.
+    WRITE: gs_data-netwr,'             ',sy-vline.
+
+    FORMAT RESET INTENSIFIED OFF COLOR COL_KEY.
+    WRITE: gs_data-kunnr,' ',sy-vline.
+
+    FORMAT RESET INTENSIFIED ON COLOR COL_GROUP.
+    WRITE:  gs_data-erdat,'  ',sy-vline.
+
+    FORMAT RESET INTENSIFIED ON COLOR COL_NEGATIVE.
+    WRITE: gs_data-auart,' ',sy-vline.
+
+
+    aratoplam = gs_data-netwr + aratoplam.
+
+    IF sno <> gs_data-vbeln.
+
+      WRITE: sy-uline(189).
+      FORMAT RESET INTENSIFIED ON COLOR COL_BACKGROUND.
+      WRITE: / bosluk,' ',sy-vline.
+      FORMAT RESET INTENSIFIED ON COLOR COL_POSITIVE.
+      WRITE: 'Ara Toplam:',aratoplam,gs_data-waerk.
+      WRITE: sy-vline.
+      FORMAT RESET INTENSIFIED ON COLOR COL_BACKGROUND.
+
+
+      aratoplam = 0.
+
+    ENDIF.
+
+    n = n + 1.
+    READ TABLE gt_data INTO gs_data-vbeln INDEX n.
+    sno = gs_data-vbeln.
+
+
+    toplam = gs_data-netwr + toplam.
+
+  ENDLOOP.
+  WRITE: sy-uline(189).
+  FORMAT RESET INTENSIFIED ON COLOR COL_NEGATIVE.
+  WRITE: / sy-vline,bosluk,sy-vline,'Toplam:          ',toplam.
+  WRITE: sy-vline,bosluk2,sy-vline.
+
+  WRITE sy-uline(189).
+ENDFORM.
+
+FORM get_split USING cs_value CHANGING vbeln posnr.
+
+  CLEAR vbeln.
+  CLEAR posnr.
+
+  CONDENSE cs_value NO-GAPS.
+
+  SPLIT cs_value AT '|' INTO : bos vbeln posnr bos .
+
+  CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+    EXPORTING
+      input  = vbeln
+    IMPORTING
+      output = vbeln.
+
+  CONDENSE posnr.
+
+ENDFORM.
+
+
+FORM write_detail_table TABLES gt_data2 TYPE tt_data2.
+
+  WRITE: sy-uline(204).
+  WRITE: / sy-vline, sno3, sy-vline, kalem3,sy-vline,musteri,
+  sy-vline,ad,sy-vline,city, sy-vline,sokak,sy-vline,
+  suppl1,sy-vline,suppl2,sy-vline,suppl3,sy-vline.
+
+
+  LOOP AT gt_data2 INTO gs_data2.
+
+    WRITE: sy-uline(204).
+    FORMAT RESET INTENSIFIED OFF COLOR COL_TOTAL.
+    WRITE: / sy-vline,gs_data2-vbeln3,sy-vline.
+
+    FORMAT RESET INTENSIFIED OFF COLOR COL_NORMAL.
+    WRITE: gs_data2-posnr3,sy-vline.
+
+    FORMAT RESET INTENSIFIED OFF COLOR COL_HEADING.
+    WRITE: gs_data2-kunnr2,sy-vline.
+
+    FORMAT RESET INTENSIFIED OFF COLOR COL_GROUP.
+    WRITE: gs_data2-name1,sy-vline.
+
+    FORMAT RESET INTENSIFIED OFF COLOR COL_NEGATIVE.
+    WRITE: gs_data2-city1(15),sy-vline.
+
+    FORMAT RESET INTENSIFIED OFF COLOR COL_KEY.
+    WRITE: gs_data2-street(30),sy-vline.
+
+    FORMAT RESET INTENSIFIED ON COLOR COL_GROUP.
+    WRITE: gs_data2-str_suppl1(15),sy-vline.
+
+    FORMAT RESET INTENSIFIED ON COLOR COL_NEGATIVE.
+    WRITE: gs_data2-str_suppl2(15),sy-vline.
+
+    FORMAT RESET INTENSIFIED ON COLOR COL_POSITIVE.
+    WRITE: gs_data2-str_suppl3,sy-vline.
+
+  ENDLOOP.
+  WRITE: sy-uline(204).
+
+ENDFORM.
